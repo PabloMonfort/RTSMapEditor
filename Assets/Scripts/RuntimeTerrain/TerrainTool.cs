@@ -1,7 +1,14 @@
-using System.Linq;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
+using System.IO;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+[System.Serializable]
+public class MapFile
+{
+    public float[,] heights;
+    public float[,,] splatmaps;
+}
 public sealed class TerrainTool : MonoBehaviour
 {
     public enum TerrainModificationAction
@@ -24,12 +31,17 @@ public sealed class TerrainTool : MonoBehaviour
     public TerrainModificationAction modificationAction;
     public Terrain _targetTerrain;
     private TerrainData terrainData;
+    public RectTransform loadMapBtnParent;
+    public GameObject prefabSelectableLoadMapBtn;
+    public List<GameObject> loadMapBtnList;
     private int alphamapResolution = 0;
+    public string currentMapName;
     private void Start()
     {
         // Get the TerrainData and heightmap resolution
         terrainData = _targetTerrain.terrainData;
         alphamapResolution = terrainData.alphamapResolution;
+        OpenMapListToLoad();
     }
     private void Update()
     {
@@ -74,8 +86,91 @@ public sealed class TerrainTool : MonoBehaviour
         PaintAllTerrainWithLayer(0);
         FlattenAllMap();
     }
+    public void SaveMap()
+    {
+        var heights = _targetTerrain.terrainData.GetHeights(0,0, _targetTerrain.terrainData.heightmapResolution, _targetTerrain.terrainData.heightmapResolution);
+        int splatmapResolution = _targetTerrain.terrainData.alphamapResolution;
+        float[,,] splatmapData = terrainData.GetAlphamaps(0, 0, splatmapResolution, splatmapResolution);
+       
+        MapFile newMapFile = new MapFile()
+        {
+            heights = heights,
+            splatmaps = splatmapData
+        };
 
+        string json = JsonConvert.SerializeObject(newMapFile);
+        string saveFileName = "/" + currentMapName + ".rtsmapeditor";
+        string folderName = "/Resources/Maps";
+        string savePath = Application.persistentDataPath + folderName;
+        string savePathName = savePath + saveFileName;
+        var folder = Directory.CreateDirectory(savePath); // returns a DirectoryInfo object
+        Debug.Log("saving terrain data to " + savePathName);
+        File.WriteAllText(savePathName, json);
 
+    }
+    public void ChangeSavedMapName(TMP_InputField inputfield)
+    {
+        currentMapName = inputfield.text;
+    }
+    public void OpenMapListToLoad()
+    {
+        for(int i = 0; i < loadMapBtnList.Count;i++)
+        {
+            Destroy(loadMapBtnList[i]);
+        }
+        loadMapBtnList.Clear();
+        string folderName = "/Resources/Maps";
+        string savePath = Application.persistentDataPath + folderName;
+        var dir = new DirectoryInfo(savePath);
+        FileInfo[] FilesAS = dir.GetFiles("*.rtsmapeditor"); //Getting Text files
+        foreach (FileInfo fileS in FilesAS)
+        {
+            string loadSignature = folderName + "/" + fileS.Name;
+            GameObject o = Instantiate(prefabSelectableLoadMapBtn, loadMapBtnParent);
+            o.SetActive(true);
+            o.GetComponentInChildren<TMP_Text>().text = fileS.Name;
+            loadMapBtnList.Add(o);
+            Debug.Log(string.Format("Map file was found in directory with name {0}",fileS.Name));
+            Debug.Log(loadSignature);
+        }
+    }
+    public void SelectLoadMap(TMP_Text textName)
+    {
+        currentMapName = textName.text;
+    }
+    public void LoadMap()
+    {
+        string folderName = "/Resources/Maps";
+        string loadPathFolder = Application.persistentDataPath + folderName;
+        if (Directory.Exists(loadPathFolder))
+        {
+            Debug.Log("Folder exist, seems file are extracted");
+        }
+        else
+        {
+            Debug.Log("Folder do not exist");
+        }
+        string saveFileName = "/" + currentMapName;
+        string loadPath = loadPathFolder + saveFileName;
+        if (File.Exists(loadPath))
+        {
+            string json = File.ReadAllText(loadPath);
+            //Debug.Log(json);
+            MapFile loadedMap = JsonConvert.DeserializeObject<MapFile>(json);
+            Debug.Log(json);
+            Debug.Log("loaded map data from " + loadPath);
+
+            _targetTerrain.terrainData.SetHeights(0, 0, loadedMap.heights);
+            _targetTerrain.terrainData.SetAlphamaps(0, 0, loadedMap.splatmaps);
+        }
+    }
+    public void OpenSavesMapFolder()
+    {
+        string folderName = "/Resources/Maps";
+        string savePath = Application.persistentDataPath + folderName;
+        string itemPath = savePath.Replace(@"/", @"\");   // explorer doesn't like front slashes
+        System.Diagnostics.Process.Start("explorer.exe", "/select," + itemPath);
+    }
     public void RaiseTerrain(Vector3 worldPosition, float strength, int brushWidth, int brushHeight)
     {
         var brushPosition = GetBrushPosition(worldPosition, brushWidth, brushHeight);
