@@ -9525,12 +9525,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   usarFixedUpdate: 0
-  velocidadSeguimiento: 5
+  velocidadSeguimiento: 25
   velocidadMovimientoBordePantalla: 3
-  velocidadMovimientoTeclado: 5
+  velocidadMovimientoTeclado: 25
   velocidadRotacion: 50
   velocidadPan: 10
-  velocidadRotacionMouse: 500
+  velocidadRotacionMouse: 1500
   limitarMapa: 1
   "l\xEDmiteX": 50
   "l\xEDmiteY": 50
@@ -9644,8 +9644,8 @@ Camera:
   m_GameObject: {fileID: 8349400421294907809}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0.019607844}
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0.019607844}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
