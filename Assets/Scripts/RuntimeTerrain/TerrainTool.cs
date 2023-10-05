@@ -13,14 +13,14 @@ public sealed class TerrainTool : MonoBehaviour
 {
     public enum TerrainModificationAction
     {
-        Raise,
         Lower,
-        Flatten
+        Flatten,
+        PaintOnly
     }
     public int currentPaintLayer;
     public int currentFloor;
     public int brushWidth;
-    public int brushHeight;
+
     private int brushWidthSmooth=6;
 
     private bool overUI = false;
@@ -41,7 +41,8 @@ public sealed class TerrainTool : MonoBehaviour
         // Get the TerrainData and heightmap resolution
         terrainData = _targetTerrain.terrainData;
         alphamapResolution = terrainData.alphamapResolution;
-        OpenMapListToLoad();
+        modificationAction = TerrainModificationAction.Flatten;
+        CreateNewMap();
     }
     private void Update()
     {
@@ -54,12 +55,6 @@ public sealed class TerrainTool : MonoBehaviour
 
                 switch (modificationAction)
                 {
-                    case TerrainModificationAction.Raise:
-
-                        RaiseTerrain(hit.point, strength, brushWidth, brushHeight);
-
-                        break;
-
                     case TerrainModificationAction.Lower:
 
                         LowerTerrain(hit.point, strength);
@@ -68,7 +63,12 @@ public sealed class TerrainTool : MonoBehaviour
 
                     case TerrainModificationAction.Flatten:
 
-                        FlattenTerrain(hit.point, currentFloor, brushWidth, brushHeight, currentPaintLayer);
+                        FlattenTerrain(hit.point, currentFloor, brushWidth, brushWidth, currentPaintLayer);
+
+                        break;
+                    case TerrainModificationAction.PaintOnly:
+
+                        PaintTerrain(hit.point, currentFloor, brushWidth, brushWidth, currentPaintLayer);
 
                         break;
                 }
@@ -83,7 +83,7 @@ public sealed class TerrainTool : MonoBehaviour
     public void CreateNewMap()
     {
         overUI = false;
-        PaintAllTerrainWithLayer(0);
+        PaintAllTerrainWithLayer(3);
         FlattenAllMap();
     }
     public void SaveMap()
@@ -171,27 +171,6 @@ public sealed class TerrainTool : MonoBehaviour
         string itemPath = savePath.Replace(@"/", @"\");   // explorer doesn't like front slashes
         System.Diagnostics.Process.Start("explorer.exe", "/select," + itemPath);
     }
-    public void RaiseTerrain(Vector3 worldPosition, float strength, int brushWidth, int brushHeight)
-    {
-        var brushPosition = GetBrushPosition(worldPosition, brushWidth, brushHeight);
-
-        var brushSize = GetSafeBrushSize(brushPosition.x, brushPosition.y, brushWidth, brushHeight);
-
-        var terrainData = GetTerrainData();
-
-        var heights = terrainData.GetHeights(brushPosition.x, brushPosition.y, brushSize.x, brushSize.y);
-
-        for (var y = 0; y < brushSize.y; y++)
-        {
-            for (var x = 0; x < brushSize.x; x++)
-            {
-                heights[y, x] += strength * Time.deltaTime;
-            }
-        }
-
-        terrainData.SetHeights(brushPosition.x, brushPosition.y, heights);
-    }
-
     private void LowerTerrain(Vector3 worldPosition, float strength)
     {
         if (overUI == true) return;
@@ -218,17 +197,32 @@ public sealed class TerrainTool : MonoBehaviour
     {
         if (overUI == true) return;
         float height = 0;
-        if (floor == 0)
+        if (floor == 5)
         {
-            height = 0f;
+            height = 0.004f;
         }
-        else if (floor == 1)
+        else if (floor == 4)
         {
-            height = 0.001f;
+            height = 0.003f;
         }
-        else if (floor == 2)
+        else if (floor == 3)
         {
             height = 0.002f;
+        }
+        else if (floor == 2)//sand
+        {
+            height = 0.0015f;
+            layerPaint = 3;
+        }
+        else if (floor == 1)//water
+        {
+            height = 0.001f;
+            layerPaint = 3;
+        }
+        else if (floor == 0)//ocean
+        {
+            height = 0f;
+            layerPaint = 3;
         }
         var brushPosition = GetBrushPosition(worldPosition, brushWidth, brushHeight);
 
@@ -237,6 +231,69 @@ public sealed class TerrainTool : MonoBehaviour
         var terrainData = GetTerrainData();
 
         var heights = terrainData.GetHeights(brushPosition.x, brushPosition.y, brushSize.x, brushSize.y);
+        for (var y = 0; y < brushSize.y; y++)
+        {
+            for (var x = 0; x < brushSize.x; x++)
+            {
+                heights[y, x] = height;
+            }
+        }
+        if (floor == 0 || floor == 1 || floor == 2)
+        {
+            //if is ocean we paint arena only
+            int splatmapResolution = alphamapResolution;
+            float[,,] splatmapData = terrainData.GetAlphamaps(0, 0, splatmapResolution, splatmapResolution);
+            int alphaMapLayers = terrainData.alphamapLayers;
+
+            for (var y = 0; y < brushSize.y; y++)
+            {
+                for (var x = 0; x < brushSize.x; x++)
+                {
+                    for (int i = 0; i < alphaMapLayers; i++)
+                    {
+                        // Is Cliff layer
+                        if (i == layerPaint)
+                        {
+                            splatmapData[brushPosition.y, brushPosition.x, i] = 1.0f; // Set to 1 to fully paint this layer
+                            splatmapData[brushPosition.y + y, brushPosition.x + x, i] = 1.0f; // Set to 1 to fully paint this layer
+                            splatmapData[brushPosition.y - y, brushPosition.x - x, i] = 1.0f; // Set to 1 to fully paint this layer
+                        }
+                        else
+                        {
+                            splatmapData[brushPosition.y, brushPosition.x, i] = 0f; // Set to 1 to fully paint this layer
+                            splatmapData[brushPosition.y + y, brushPosition.x + x, i] = 0f; // Set to 1 to fully paint this layer
+                            splatmapData[brushPosition.y - y, brushPosition.x - x, i] = 0f; // Set to 1 to fully paint this layer
+                        }
+                    }
+                }
+            }
+            terrainData.SetAlphamaps(0, 0, splatmapData);
+        }
+        terrainData.SetHeights(brushPosition.x, brushPosition.y, heights);
+    }
+    private void PaintTerrain(Vector3 worldPosition, int floor, int brushWidth, int brushHeight, int layerPaint)
+    {
+        if (overUI == true) return;
+
+        if (floor == 0)
+        {
+            layerPaint = 3;
+        }
+        else if (floor == 1)
+        {
+            layerPaint = 3;
+        }
+        else if (floor == 2)
+        {
+            layerPaint = 3;
+        }
+       
+        var brushPosition = GetBrushPosition(worldPosition, brushWidth, brushHeight);
+
+        var brushSize = GetSafeBrushSize(brushPosition.x, brushPosition.y, brushWidth, brushHeight);
+
+        var terrainData = GetTerrainData();
+
         int splatmapResolution = alphamapResolution;
         float[,,] splatmapData = terrainData.GetAlphamaps(0, 0, splatmapResolution, splatmapResolution);
         int alphaMapLayers = terrainData.alphamapLayers;
@@ -245,7 +302,6 @@ public sealed class TerrainTool : MonoBehaviour
         {
             for (var x = 0; x < brushSize.x; x++)
             {
-                heights[y, x] = height;
                 for (int i = 0; i < alphaMapLayers; i++)
                 {
                     // Is Cliff layer
@@ -265,7 +321,6 @@ public sealed class TerrainTool : MonoBehaviour
             }
         }
 
-        terrainData.SetHeights(brushPosition.x, brushPosition.y, heights);
         terrainData.SetAlphamaps(0, 0, splatmapData);
     }
     private void FlattenAllMap()
@@ -330,8 +385,43 @@ public sealed class TerrainTool : MonoBehaviour
         {
             modificationAction = TerrainModificationAction.Lower;
         }
+        else if (value == 2)
+        {
+            modificationAction = TerrainModificationAction.PaintOnly;
+        }
     }
-
+    public void ChangeBrushSize(TMP_Dropdown dropdown)
+    {
+        int value = dropdown.value;
+        if (value == 0)
+        {
+            brushWidth = 2;
+        }
+        else if (value == 1)
+        {
+            brushWidth = 4;
+        }
+        else if (value == 2)
+        {
+            brushWidth = 6;
+        }
+        else if (value == 3)
+        {
+            brushWidth = 8;
+        }
+        else if (value == 4)
+        {
+            brushWidth = 10;
+        }
+        else if (value == 5)
+        {
+            brushWidth = 12;
+        }
+        else if (value == 6)
+        {
+            brushWidth = 14;
+        }
+    }
     private TerrainData GetTerrainData() => _targetTerrain.terrainData;
 
     private int GetHeightmapResolution() => GetTerrainData().heightmapResolution;
