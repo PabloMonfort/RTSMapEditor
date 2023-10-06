@@ -3,6 +3,8 @@ using TMPro;
 using System.IO;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Unity.VisualScripting;
+
 [System.Serializable]
 public class MapFile
 {
@@ -13,7 +15,7 @@ public sealed class TerrainTool : MonoBehaviour
 {
     public enum TerrainModificationAction
     {
-        Lower,
+        Smooth,
         Flatten,
         PaintOnly
     }
@@ -55,10 +57,10 @@ public sealed class TerrainTool : MonoBehaviour
 
                 switch (modificationAction)
                 {
-                    case TerrainModificationAction.Lower:
+                    case TerrainModificationAction.Smooth:
 
-                        LowerTerrain(hit.point, strength);
-
+                        //LowerTerrain(hit.point, strength);
+                        SmoothTerrain(hit.point, brushWidth, brushWidth, currentPaintLayer);
                         break;
 
                     case TerrainModificationAction.Flatten:
@@ -171,28 +173,6 @@ public sealed class TerrainTool : MonoBehaviour
         string itemPath = savePath.Replace(@"/", @"\");   // explorer doesn't like front slashes
         System.Diagnostics.Process.Start("explorer.exe", "/select," + itemPath);
     }
-    private void LowerTerrain(Vector3 worldPosition, float strength)
-    {
-        if (overUI == true) return;
-        var brushPosition = GetBrushPosition(worldPosition, brushWidthSmooth, brushWidthSmooth);
-
-        var brushSize = GetSafeBrushSize(brushPosition.x, brushPosition.y, brushWidthSmooth, brushWidthSmooth);
-
-        var terrainData = GetTerrainData();
-
-        var heights = terrainData.GetHeights(brushPosition.x, brushPosition.y, brushSize.x, brushSize.y);
-
-        for (var y = 0; y < brushSize.y; y++)
-        {
-            for (var x = 0; x < brushSize.x; x++)
-            {
-                heights[y, x] -= strength * Time.deltaTime;
-            }
-        }
-
-        terrainData.SetHeights(brushPosition.x, brushPosition.y, heights);
-    }
-
     private void FlattenTerrain(Vector3 worldPosition, int floor, int brushWidth, int brushHeight, int layerPaint)
     {
         if (overUI == true) return;
@@ -212,17 +192,14 @@ public sealed class TerrainTool : MonoBehaviour
         else if (floor == 2)//sand
         {
             height = 0.0015f;
-            layerPaint = 3;
         }
         else if (floor == 1)//water
         {
             height = 0.001f;
-            layerPaint = 3;
         }
         else if (floor == 0)//ocean
         {
             height = 0f;
-            layerPaint = 3;
         }
         var brushPosition = GetBrushPosition(worldPosition, brushWidth, brushHeight);
 
@@ -238,56 +215,12 @@ public sealed class TerrainTool : MonoBehaviour
                 heights[y, x] = height;
             }
         }
-        if (floor == 0 || floor == 1 || floor == 2)
-        {
-            //if is ocean we paint arena only
-            int splatmapResolution = alphamapResolution;
-            float[,,] splatmapData = terrainData.GetAlphamaps(0, 0, splatmapResolution, splatmapResolution);
-            int alphaMapLayers = terrainData.alphamapLayers;
-
-            for (var y = 0; y < brushSize.y; y++)
-            {
-                for (var x = 0; x < brushSize.x; x++)
-                {
-                    for (int i = 0; i < alphaMapLayers; i++)
-                    {
-                        // Is Cliff layer
-                        if (i == layerPaint)
-                        {
-                            splatmapData[brushPosition.y, brushPosition.x, i] = 1.0f; // Set to 1 to fully paint this layer
-                            splatmapData[brushPosition.y + y, brushPosition.x + x, i] = 1.0f; // Set to 1 to fully paint this layer
-                            splatmapData[brushPosition.y - y, brushPosition.x - x, i] = 1.0f; // Set to 1 to fully paint this layer
-                        }
-                        else
-                        {
-                            splatmapData[brushPosition.y, brushPosition.x, i] = 0f; // Set to 1 to fully paint this layer
-                            splatmapData[brushPosition.y + y, brushPosition.x + x, i] = 0f; // Set to 1 to fully paint this layer
-                            splatmapData[brushPosition.y - y, brushPosition.x - x, i] = 0f; // Set to 1 to fully paint this layer
-                        }
-                    }
-                }
-            }
-            terrainData.SetAlphamaps(0, 0, splatmapData);
-        }
         terrainData.SetHeights(brushPosition.x, brushPosition.y, heights);
     }
     private void PaintTerrain(Vector3 worldPosition, int floor, int brushWidth, int brushHeight, int layerPaint)
     {
         if (overUI == true) return;
 
-        if (floor == 0)
-        {
-            layerPaint = 3;
-        }
-        else if (floor == 1)
-        {
-            layerPaint = 3;
-        }
-        else if (floor == 2)
-        {
-            layerPaint = 3;
-        }
-       
         var brushPosition = GetBrushPosition(worldPosition, brushWidth, brushHeight);
 
         var brushSize = GetSafeBrushSize(brushPosition.x, brushPosition.y, brushWidth, brushHeight);
@@ -307,21 +240,98 @@ public sealed class TerrainTool : MonoBehaviour
                     // Is Cliff layer
                     if (i == layerPaint)
                     {
-                        splatmapData[brushPosition.y, brushPosition.x, i] = 1.0f; // Set to 1 to fully paint this layer
-                        splatmapData[brushPosition.y + y, brushPosition.x + x, i] = 1.0f; // Set to 1 to fully paint this layer
-                        splatmapData[brushPosition.y - y, brushPosition.x - x, i] = 1.0f; // Set to 1 to fully paint this layer
+                        splatmapData[brushPosition.y, brushPosition.x, i] = 1;
+                        splatmapData[brushPosition.y+y, brushPosition.x+x, i] = 1;
+                        splatmapData[brushPosition.y-y, brushPosition.x-x, i] = 1;
                     }
                     else
                     {
-                        splatmapData[brushPosition.y, brushPosition.x, i] = 0f; // Set to 1 to fully paint this layer
-                        splatmapData[brushPosition.y + y, brushPosition.x + x, i] = 0f; // Set to 1 to fully paint this layer
-                        splatmapData[brushPosition.y - y, brushPosition.x - x, i] = 0f; // Set to 1 to fully paint this layer
+                        splatmapData[brushPosition.y, brushPosition.x, i] = 0f;
+                        splatmapData[brushPosition.y + y, brushPosition.x + x, i] = 0;
+                        splatmapData[brushPosition.y - y, brushPosition.x - x, i] = 0;
                     }
                 }
             }
         }
 
         terrainData.SetAlphamaps(0, 0, splatmapData);
+    }
+    public void SmoothTerrain(Vector3 worldPosition, int brushWidth, int brushHeight, int layerPaint)
+    {
+        var brushPosition = GetBrushPosition(worldPosition, brushWidth, brushHeight);
+
+        var brushSize = GetSafeBrushSize(brushPosition.x, brushPosition.y, brushWidth, brushHeight);
+
+        float smoothingIntensity = 0.25f;
+        TerrainData terrainData = _targetTerrain.terrainData;
+        int heightmapWidth = brushSize.x;
+        int heightmapHeight = brushSize.y;
+        float[,] heights = terrainData.GetHeights(brushPosition.x, brushPosition.y, brushSize.x, brushSize.y);
+
+        for (int x = 0; x < heightmapWidth; x++)
+        {
+            for (int z = 0; z < heightmapHeight; z++)
+            {
+                float averageHeight = 0f;
+                int sampleCount = 0;
+
+                for (int i = -1; i <= 1; i++)
+                {
+                    for (int j = -1; j <= 1; j++)
+                    {
+                        int neighborX = x + i;
+                        int neighborZ = z + j;
+
+                        if (neighborX >= 0 && neighborX < heightmapWidth && neighborZ >= 0 && neighborZ < heightmapHeight)
+                        {
+                            averageHeight += heights[neighborX, neighborZ];
+                            sampleCount++;
+                        }
+                    }
+                }
+
+                averageHeight /= sampleCount;
+                heights[x, z] = Mathf.Lerp(heights[x, z], averageHeight, smoothingIntensity);
+            }
+        }
+
+        terrainData.SetHeights(brushPosition.x, brushPosition.y, heights);
+    }
+    public void SmoothAllTerrain()
+    {
+        TerrainData terrainData = _targetTerrain.terrainData;
+        int heightmapWidth = terrainData.heightmapResolution;
+        int heightmapHeight = terrainData.heightmapResolution;
+        float[,] heights = terrainData.GetHeights(0, 0, heightmapWidth, heightmapHeight);
+
+        for (int x = 0; x < heightmapWidth; x++)
+        {
+            for (int z = 0; z < heightmapHeight; z++)
+            {
+                float averageHeight = 0f;
+                int sampleCount = 0;
+
+                for (int i = -1; i <= 1; i++)
+                {
+                    for (int j = -1; j <= 1; j++)
+                    {
+                        int neighborX = x + i;
+                        int neighborZ = z + j;
+
+                        if (neighborX >= 0 && neighborX < heightmapWidth && neighborZ >= 0 && neighborZ < heightmapHeight)
+                        {
+                            averageHeight += heights[neighborX, neighborZ];
+                            sampleCount++;
+                        }
+                    }
+                }
+
+                averageHeight /= sampleCount;
+                heights[x, z] = Mathf.Lerp(heights[x, z], averageHeight, 0.50f);
+            }
+        }
+
+        terrainData.SetHeights(0, 0, heights);
     }
     private void FlattenAllMap()
     {
@@ -383,7 +393,7 @@ public sealed class TerrainTool : MonoBehaviour
         }
         else if (value == 1)
         {
-            modificationAction = TerrainModificationAction.Lower;
+            modificationAction = TerrainModificationAction.Smooth;
         }
         else if (value == 2)
         {
@@ -459,5 +469,23 @@ public sealed class TerrainTool : MonoBehaviour
         while (heightmapResolution - (brushY + brushHeight) < 0) brushHeight--;
 
         return new Vector2Int(brushWidth, brushHeight);
+    }
+    public void ManageDetail()
+    {
+        /*
+        // read all detail layers into a 3D int array:
+        int numDetails = terrainData.detailPrototypes.Length;
+        int[,,] detailMapData = new int[terrainData.detailWidth, terrainData.detailHeight, numDetails];
+        for (int layerNum = 0; layerNum < numDetails; layerNum++)
+        {
+            int[,] detailLayer = terrainData.GetDetailLayer(int x, int y, int width, int height, int layerNum);
+        }
+
+        // write all detail data to terrain data:
+        for (int n = 0; n < detailMapData.Length; n++)
+        {
+            terrainData.SetDetailLayer(0, 0, n, detailMapData[n]);
+        }*/
+
     }
 }
