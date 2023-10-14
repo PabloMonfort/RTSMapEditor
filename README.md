@@ -16,5 +16,4 @@ WATER SHADER WE USED => https://github.com/nvjob/nvjob-water-shader-simple-and-f
 
 Gracias por leer.
 
-Busco trabajo https://www.linkedin.com/in/pablo-monfort-developer/
 ![image](https://github.com/PabloMonfort/RTSMapEditor/assets/30636592/fbb4daca-167a-4904-ab28-23b7b1f7104f)
