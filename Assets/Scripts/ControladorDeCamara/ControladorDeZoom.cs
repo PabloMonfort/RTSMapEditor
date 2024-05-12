@@ -18,7 +18,7 @@ public class ControladorDeZoom : MonoBehaviour
         {
             if (RuedaScroll > 0)
             {
-                if (Camera.main.transform.position.y > 25)
+                if (Camera.main.transform.position.y > 4)
                 {
                     Camera.main.transform.position += Camera.main.transform.forward * RuedaScroll * sensibilidadZoomRuedaScroll;
                 }
@@ -35,7 +35,7 @@ public class ControladorDeZoom : MonoBehaviour
         {
             if (RuedaScroll > 0)
             {
-                if (Camera.main.transform.position.y > 25)
+                if (Camera.main.transform.position.y > 4)
                 {
                     Camera.main.transform.position += Camera.main.transform.forward * DirecciónZoom * sensibilidadZoomTeclado;
                 }
